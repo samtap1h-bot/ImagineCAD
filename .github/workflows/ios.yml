@@ -1,0 +1,35 @@
+name: Compilar ImagineCAD (Rust / iOS)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v4
+
+      - name: Instalar Rust y target de iOS
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+
+      - name: Compilar crate de ImagineCAD
+        run: |
+          cargo build --release --target aarch64-apple-ios
+
+      - name: Generar paquete Payload (.ipa)
+        run: |
+          mkdir -p build/Payload
+          # El ejecutable compilado por Cargo se encuentra en target/aarch64-apple-ios/release/
+          cp -R target/aarch64-apple-ios/release/imaginecad build/Payload/ || true
+          cd build
+          zip -r ImagineCAD_unsigned.ipa Payload
+
+      - name: Subir .ipa para descarga
+        uses: actions/upload-artifact@v4
+        with:
+          name: ImagineCAD-IPA
+          path: build/ImagineCAD_unsigned.ipa
