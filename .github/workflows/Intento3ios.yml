@@ -1,0 +1,68 @@
+name: Compilar ImagineCAD (Rust / iOS)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Descargar código fuente
+        uses: actions/checkout@v4
+
+      - name: Instalar Rust 1.75.0 y target de iOS
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: '1.75.0'
+          targets: aarch64-apple-ios
+
+      - name: Compilar crate de ImagineCAD
+        run: |
+          cargo build --release --target aarch64-apple-ios --no-default-features || cargo build --release --target aarch64-apple-ios --workspace || true
+
+      - name: Generar App Bundle (.app) y Paquete Payload (.ipa)
+        run: |
+          # Crear la estructura de carpeta .app exigida por iOS
+          mkdir -p build/Payload/ImagineCAD.app
+          
+          # Copiar binario y asignar permisos de ejecución
+          cp target/aarch64-apple-ios/release/imaginecad build/Payload/ImagineCAD.app/ImagineCAD || cp target/aarch64-apple-ios/release/* build/Payload/ImagineCAD.app/ImagineCAD || true
+          chmod +x build/Payload/ImagineCAD.app/ImagineCAD
+          
+          # Generar Info.plist indispensable para AltStore/SideStore
+          cat << 'EOF' > build/Payload/ImagineCAD.app/Info.plist
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleExecutable</key>
+              <string>ImagineCAD</string>
+              <key>CFBundleIdentifier</key>
+              <string>com.samtap1h.imaginecad</string>
+              <key>CFBundleName</key>
+              <string>ImagineCAD</string>
+              <key>CFBundlePackageType</key>
+              <string>APPL</string>
+              <key>CFBundleShortVersionString</key>
+              <string>1.0</string>
+              <key>CFBundleVersion</key>
+              <string>1</string>
+              <key>LSRequiresIPhoneOS</key>
+              <true/>
+              <key>UIRequiredDeviceCapabilities</key>
+              <array>
+                  <string>arm64</string>
+              </array>
+          </dict>
+          </plist>
+          EOF
+
+          cd build
+          zip -r ImagineCAD_unsigned.ipa Payload
+
+      - name: Subir .ipa para descarga
+        uses: actions/upload-artifact@v4
+        with:
+          name: ImagineCAD-IPA
+          path: build/ImagineCAD_unsigned.ipa
